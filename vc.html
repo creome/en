@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f2ea">
+<title>Vocab Reader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f2ea; --surface:#fffdf8; --ink:#1f1d1a; --muted:#6b665d; --line:#e4ddd0;
+  --accent:#b9532f; --accent-soft:#f1dfd6; --mark:#f6e3a1;
+  --serif:'Newsreader',Georgia,'Times New Roman',serif;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+:root[data-theme="dark"]{
+  --bg:#171614; --surface:#1f1d1b; --ink:#ece7dd; --muted:#a39d91; --line:#302d29;
+  --accent:#e58a6e; --accent-soft:#3a2a24; --mark:#5a4a1c;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:18px;line-height:1.5;
+  padding-bottom:env(safe-area-inset-bottom)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+
+/* ---------- top bar ---------- */
+.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
+  padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top))}
+.top .row{display:flex;gap:8px;align-items:center;max-width:1100px;margin:0 auto;position:relative;z-index:2}
+.top .row + .row{margin-top:8px}
+.brand{font-family:var(--serif);font-weight:600;font-size:20px;letter-spacing:.2px;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icon-btn{background:transparent;border:1px solid var(--line);border-radius:10px;width:38px;height:38px;
+  display:grid;place-items:center;color:var(--ink)}
+.icon-btn:hover{background:var(--surface)}
+.icon-btn svg{width:18px;height:18px}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;flex:1}
+.tab{flex:1;border:0;background:transparent;border-radius:9px;padding:7px 6px;font-family:var(--sans);
+  font-size:13.5px;font-weight:500;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--accent);color:#fff}
+.search{flex:1;min-width:0;position:relative}
+.search input{width:100%;height:38px;border:1px solid var(--line);background:var(--surface);border-radius:10px;
+  padding:0 34px 0 12px;font-family:var(--sans);font-size:14px;outline:none}
+.search input::-webkit-search-cancel-button{display:none}
+.search input:focus{border-color:var(--accent)}
+.search .clear{position:absolute;right:4px;top:4px;width:30px;height:30px;border:0;background:transparent;
+  color:var(--muted);font-size:18px;display:none}
+.search.has .clear{display:block}
+select{height:38px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:0 8px;
+  font-family:var(--sans);font-size:13.5px;max-width:46vw;min-width:0}
+
+/* ---------- panel ---------- */
+.icon-btn{position:relative;flex:none}
+.dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:1}
+.panel{position:absolute;left:0;right:0;top:100%;z-index:3;background:var(--bg);border-bottom:1px solid var(--line);
+  box-shadow:0 18px 30px rgba(0,0,0,.18);padding:14px 16px 16px;max-height:calc(100vh - 60px);overflow:auto;
+  display:flex;flex-direction:column;gap:12px}
+.panel > *{width:100%;max-width:1100px;margin:0 auto}
+.prow{display:flex;gap:8px;align-items:center}
+.prow select{flex:1;max-width:none}
+.pf{display:flex;flex-direction:column;gap:10px;font-family:var(--sans);font-size:13px}
+.pf .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pf select{width:100%;max-width:none}
+.pf .count{margin:0;color:var(--muted)}
+/* ---------- layout ---------- */
+main{width:min(1100px,100% - 32px);margin:0 auto;padding:14px 0 60px}
+.filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 14px;font-family:var(--sans);font-size:13px}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:4px 11px;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.count{margin-left:auto;color:var(--muted)}
+h2.sec{font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line);column-span:all}
+.cols{columns:2 420px;column-gap:36px}
+.e{margin:0 0 8px;break-inside:avoid;padding-left:2.1em;text-indent:-2.1em}
+.n{display:inline-block;width:2.1em;text-indent:0;color:var(--muted);font-variant-numeric:tabular-nums;
+  font-family:var(--sans);font-size:.78em}
+.e b{font-weight:600}
+.pl{color:var(--muted)}
+.empty{text-align:center;color:var(--muted);padding:60px 10px;font-family:var(--sans);font-size:15px}
+.empty h3{font-family:var(--serif);font-size:24px;color:var(--ink);margin:0 0 8px}
+.empty code{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 16px;font-family:var(--sans);
+  font-size:14px;font-weight:500}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
+
+/* ---------- dictionary ---------- */
+.az{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;font-family:var(--sans);font-size:13px}
+.az a{color:var(--muted);text-decoration:none;padding:3px 7px;border:1px solid var(--line);border-radius:7px}
+.az a:hover{color:var(--ink);background:var(--surface)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:0 0 10px;break-inside:avoid}
+.card .h{font-weight:600;font-size:1.05em}
+.card .meta{font-family:var(--sans);font-size:12.5px;color:var(--muted);margin:2px 0 4px}
+.card .tag{display:inline-block;margin-right:6px;padding:0 7px;border:1px solid var(--line);border-radius:999px}
+.letter{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--accent);margin:18px 0 6px;column-span:all;scroll-margin-top:130px}
+
+/* ---------- flashcards ---------- */
+.fc{max-width:640px;margin:0 auto}
+.fc-bar{display:flex;justify-content:space-between;gap:10px;font-family:var(--sans);font-size:13px;color:var(--muted);margin-bottom:8px;flex-wrap:wrap}
+.prog{height:4px;background:var(--line);border-radius:4px;overflow:hidden;margin-bottom:16px}
+.prog i{display:block;height:100%;background:var(--accent);transition:width .25s}
+.flip{width:100%;min-height:300px;background:var(--surface);border:1px solid var(--line);border-radius:20px;
+  padding:28px 24px;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px}
+.flip .big{font-size:clamp(28px,7vw,40px);font-weight:600;line-height:1.15}
+.flip .small{font-family:var(--sans);font-size:13.5px;color:var(--muted)}
+.flip .def{font-size:clamp(19px,4.6vw,23px);line-height:1.4}
+.flip .hint{font-family:var(--sans);font-size:13px;color:var(--muted);margin-top:10px}
+.grades{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.grades .btn{padding:12px 6px}
+.grades .again{border-color:#b94a48;color:#b94a48}
+.grades .easy{border-color:#4c8a5a;color:#4c8a5a}
+.fc-tools{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:18px;font-family:var(--sans);font-size:13px}
+.fc-tools .chip{cursor:pointer}
+.done{padding:50px 10px}
+.hidden{display:none !important}
+@media (max-width:560px){ body{font-size:17px} }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="row">
+    <div class="search" id="searchBox">
+      <input id="q" type="search" placeholder="Search word, form or meaning…" autocomplete="off" spellcheck="false">
+      <button class="clear" id="clearQ" aria-label="Clear search">×</button>
+    </div>
+    <button class="icon-btn" id="menuBtn" title="Menu" aria-label="Menu" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+      <span class="dot hidden" id="dot"></span>
+    </button>
+  </div>
+  <div class="scrim hidden" id="scrim"></div>
+  <div class="panel hidden" id="panel" role="dialog" aria-label="Menu">
+    <div class="prow">
+      <div class="brand" id="brand">Vocab Reader</div>
+      <button class="icon-btn" id="themeBtn" title="Light / dark" aria-label="Toggle light and dark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+      <button class="icon-btn" id="closeBtn" title="Close" aria-label="Close menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-mode="simple">Simple</button>
+      <button class="tab" role="tab" data-mode="dict">Dictionary</button>
+      <button class="tab" role="tab" data-mode="flash">Flashcards</button>
+    </div>
+    <div class="prow">
+      <select id="setSel" aria-label="Vocabulary set"></select>
+      <button class="icon-btn" id="addBtn" title="Add vocabulary file(s)" aria-label="Add vocabulary file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="icon-btn" id="delBtn" title="Remove this set" aria-label="Remove set">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+      </button>
+    </div>
+    <div class="pf" id="pfilters"></div>
+  </div>
+</header>
+
+<main id="view"></main>
+<input type="file" id="file" accept=".txt,.vocab,text/plain" multiple hidden>
+
+<script>
+/* =========================================================================
+   VOCAB READER  -  reusable engine
+   Data = plain text files, one entry per line:
+       # title: My Set Title            (optional)
+       ## Section name                  (optional, can repeat)
+       word (forms) | pos | level | definition
+   Level "–" = no level (scientific terms, abbreviations).
+   ========================================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm = s => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const rx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function hl(s, q) {
+  if (!q) return esc(s);
+  const parts = s.split(new RegExp('(' + rx(q) + ')', 'ig'));
+  return parts.map((p, i) => i % 2 ? '<mark>' + esc(p) + '</mark>' : esc(p)).join('');
+}
+const LEVEL_ORDER = ['A2', 'B1', 'B2', 'C1', 'C2', '–'];
+
+/* ---------------- parsing ---------------- */
+function parse(text, name) {
+  let title = name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+  const sections = []; let cur = null, m;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if ((m = line.match(/^#\s*title\s*:\s*(.+)$/i))) { title = m[1].trim(); continue; }
+    if ((m = line.match(/^##\s*(.+)$/))) { cur = { name: m[1].trim(), items: [] }; sections.push(cur); continue; }
+    if (line[0] === '#') continue;
+    const p = line.split('|').map(s => s.trim());
+    if (p.length < 4) continue;
+    if (!cur) { cur = { name: '', items: [] }; sections.push(cur); }
+    const head = p[0], hm = head.match(/^([^(]+?)\s*(?:\((.*)\))?$/);
+    cur.items.push({ head, word: hm ? hm[1].trim() : head, forms: hm && hm[2] ? hm[2] : '',
+      pos: p[1], level: p[2] || '–', def: p.slice(3).join(' | ') });
+  }
+  for (const s of sections) s.items.sort((a, b) => norm(a.word).localeCompare(norm(b.word)));
+  return { title, sections };
+}
+const hashId = s => { let h = 5381; for (const c of s) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0; return 's' + h.toString(36); };
+
+/* ---------------- state ---------------- */
+const S = {
+  sets: store.get('vr.sets', []),       // [{id, name, text}]
+  setId: store.get('vr.setId', null),
+  mode: store.get('vr.mode', 'simple'),
+  theme: store.get('vr.theme', null),
+  q: '', section: 'all', levels: new Set(), prog: store.get('vr.prog', {}),
+  F: { queue: [], flipped: false, dir: 'wm', shuffle: false, total: 0 }
+};
+const parsed = {};
+function cur() {
+  let s = S.sets.find(x => x.id === S.setId) || S.sets[0];
+  if (!s) return null;
+  S.setId = s.id;
+  if (!parsed[s.id]) parsed[s.id] = parse(s.text, s.name);
+  return { meta: s, data: parsed[s.id] };
+}
+const key = it => S.setId + '::' + it.head;
+const saveProg = () => store.set('vr.prog', S.prog);
+
+/* items for the current set after section / level / search filters */
+function items(withSearch = true) {
+  const c = cur(); if (!c) return [];
+  const q = withSearch ? norm(S.q.trim()) : '';
+  let out = [];
+  c.data.sections.forEach((sec, si) => {
+    if (S.section !== 'all' && String(si) !== S.section) return;
+    for (const it of sec.items) {
+      if (S.levels.size && !S.levels.has(it.level)) continue;
+      if (q) {
+        const w = norm(it.word), f = norm(it.forms), d = norm(it.def);
+        let sc = w.startsWith(q) ? 0 : w.includes(q) ? 1 : f.includes(q) ? 2 : d.includes(q) ? 3 : -1;
+        if (sc < 0) continue;
+        out.push({ ...it, _sec: sec.name, _si: si, _sc: sc });
+      } else out.push({ ...it, _sec: sec.name, _si: si, _sc: 0 });
+    }
+  });
+  return out;
+}
+
+/* ---------------- UI chrome ---------------- */
+function applyTheme() {
+  const t = S.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.dataset.theme = t;
+  $('meta[name=theme-color]').content = t === 'dark' ? '#171614' : '#f6f2ea';
+}
+function chrome() {
+  S.sets.forEach(x => { if (!parsed[x.id]) parsed[x.id] = parse(x.text, x.name); });
+  const c = cur();
+  $('#brand').textContent = c ? c.data.title : 'Vocab Reader';
+  $('#setSel').innerHTML = S.sets.map(s => `<option value="${s.id}" ${s.id === S.setId ? 'selected' : ''}>${esc(parsed[s.id] ? parsed[s.id].title : s.name.replace(/\.[^.]+$/, ''))}</option>`).join('');
+  $('#setSel').classList.toggle('hidden', S.sets.length < 2);
+  $('#delBtn').classList.toggle('hidden', !c);
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.mode === S.mode));
+  $('#searchBox').classList.toggle('has', !!S.q);
+}
+function panelFilters() {
+  const c = cur(); if (!c) { $('#pfilters').innerHTML = ''; return; }
+  const total = items(false).length, shown = items().length, lv = new Set();
+  c.data.sections.forEach(s => s.items.forEach(i => lv.add(i.level)));
+  const lvls = LEVEL_ORDER.filter(l => lv.has(l)).concat([...lv].filter(l => !LEVEL_ORDER.includes(l)));
+  let h = '';
+  if (c.data.sections.length > 1 || (c.data.sections[0] && c.data.sections[0].name)) {
+    h += `<select id="secSel"><option value="all">All sections</option>` +
+      c.data.sections.map((s, i) => `<option value="${i}" ${String(i) === S.section ? 'selected' : ''}>${esc(s.name || 'Words')}</option>`).join('') + '</select>';
+  }
+  h += '<div class="chips">' + lvls.map(l => `<button class="chip" data-lv="${l}" aria-pressed="${S.levels.has(l)}">${l}</button>`).join('') +
+    `<span class="count">${shown}${shown !== total ? ' / ' + total : ''} words</span></div>`;
+  $('#pfilters').innerHTML = h;
+  $('#dot').classList.toggle('hidden', !(S.section !== 'all' || S.levels.size));
+}
+const filtersBar = () => '';
+function bindFilters() {
+  const ss = $('#secSel'); if (ss) ss.onchange = e => { S.section = e.target.value; render(); };
+  document.querySelectorAll('.chip[data-lv]').forEach(b => b.onclick = () => {
+    const l = b.dataset.lv; S.levels.has(l) ? S.levels.delete(l) : S.levels.add(l); render();
+  });
+}
+const tagOf = it => it.level === '–' ? esc(it.pos) : esc(it.pos) + ' · ' + esc(it.level);
+
+/* ---------------- MODE 1: simple (PDF pattern) ---------------- */
+function viewSimple() {
+  const c = cur(), all = items(false), list = items();
+  let h = filtersBar(all.length, list.length);
+  if (!list.length) return h + '<div class="empty">No words match.</div>';
+  const q = S.q.trim(); let html = '';
+  c.data.sections.forEach((sec, si) => {
+    const its = list.filter(i => i._si === si); if (!its.length) return;
+    if (sec.name) html += `<h2 class="sec">${esc(sec.name)}</h2>`;
+    html += '<div class="cols">' + its.map((it, n) =>
+      `<p class="e"><span class="n">${n + 1}.</span> <b>${hl(it.head, q)}</b> <i class="pl">${tagOf(it)}</i> – ${hl(it.def, q)}</p>`).join('') + '</div>';
+  });
+  return h + html;
+}
+
+/* ---------------- MODE 2: dictionary (searchable) ---------------- */
+function viewDict() {
+  const q = S.q.trim(), all = items(false);
+  let list = items();
+  // merge identical headwords that occur in several sections
+  const m = new Map();
+  for (const it of list) {
+    const k = it.head.toLowerCase();
+    if (!m.has(k)) m.set(k, { ...it, secs: [] });
+    if (it._sec && !m.get(k).secs.includes(it._sec)) m.get(k).secs.push(it._sec);
+  }
+  list = [...m.values()];
+  if (q) list.sort((a, b) => a._sc - b._sc || norm(a.word).localeCompare(norm(b.word)));
+  else list.sort((a, b) => norm(a.word).localeCompare(norm(b.word)));
+  let h = filtersBar(all.length, list.length);
+  if (!list.length) return h + '<div class="empty">Nothing found for “' + esc(q) + '”.</div>';
+  const card = it => `<div class="card"><div class="h">${hl(it.head, q)}</div>
+    <div class="meta"><i>${tagOf(it)}</i>${it.secs.length ? ' · ' + it.secs.map(s => `<span class="tag">${esc(s)}</span>`).join('') : ''}</div>
+    <div>${hl(it.def, q)}</div></div>`;
+  if (q) return h + '<div class="cols">' + list.map(card).join('') + '</div>';
+  const letters = [...new Set(list.map(i => norm(i.word)[0].toUpperCase()))];
+  h += '<div class="az">' + letters.map(l => `<a href="#L-${l}">${l}</a>`).join('') + '</div><div class="cols">';
+  let last = '';
+  for (const it of list) {
+    const l = norm(it.word)[0].toUpperCase();
+    if (l !== last) { h += `<div class="letter" id="L-${l}">${l}</div>`; last = l; }
+    h += card(it);
+  }
+  return h + '</div>';
+}
+
+/* ---------------- MODE 3: flashcards (spaced repetition) ---------------- */
+const DAYS = [0, 1, 3, 7, 14, 30];
+function buildQueue() {
+  const now = Date.now(), due = [], fresh = [];
+  for (const it of items()) {
+    const r = S.prog[key(it)];
+    if (!r) fresh.push(it); else if (r.due <= now) due.push(it);
+  }
+  due.sort((a, b) => S.prog[key(a)].due - S.prog[key(b)].due);
+  if (S.F.shuffle) fresh.sort(() => Math.random() - .5);
+  S.F.queue = due.concat(fresh); S.F.total = S.F.queue.length; S.F.flipped = false;
+  S.F.nDue = due.length; S.F.nNew = fresh.length;
+}
+function maskWord(def, word) {
+  const stem = word.split(/[\s-]+/).filter(w => w.length > 3).map(w => rx(w.slice(0, Math.max(3, w.length - 2))));
+  if (!stem.length) return def;
+  return def.replace(new RegExp('\\b(' + stem.join('|') + ')\\w*', 'ig'), '___');
+}
+function viewFlash() {
+  const c = cur(), all = items(false);
+  const known = all.filter(i => (S.prog[key(i)] || {}).box >= 3).length;
+  const q = S.F.queue, it = q[0];
+  let h = filtersBar(all.length, items().length);
+  h += '<div class="fc">';
+  h += `<div class="fc-bar"><span>${q.length} left · ${q.filter(x => !S.prog[key(x)]).length} new · ${q.filter(x => S.prog[key(x)]).length} due</span><span>learned ${known} / ${all.length}</span></div>`;
+  h += `<div class="prog"><i style="width:${S.F.total ? Math.round((1 - q.length / S.F.total) * 100) : 100}%"></i></div>`;
+  if (!it) {
+    h += `<div class="flip done"><div class="big">All done</div><div class="small">Nothing due right now. Come back later, or change the filters.</div></div>`;
+  } else if (!S.F.flipped) {
+    const front = S.F.dir === 'wm' ? `<div class="big">${esc(it.word)}</div>` : `<div class="def">${esc(maskWord(it.def, it.word))}</div>`;
+    h += `<button class="flip" id="card">${front}<div class="hint">${S.F.dir === 'wm' ? 'Say the meaning out loud, then tap' : 'Say the word out loud, then tap'}</div></button>`;
+  } else {
+    h += `<button class="flip" id="card"><div class="big">${esc(it.head)}</div><div class="small"><i>${tagOf(it)}</i></div><div class="def">${esc(it.def)}</div></button>
+      <div class="grades"><button class="btn again" data-g="0">Again <small>(1)</small></button><button class="btn" data-g="1">Good <small>(2)</small></button><button class="btn easy" data-g="2">Easy <small>(3)</small></button></div>`;
+  }
+  h += `<div class="fc-tools">
+    <button class="chip" id="dirBtn">${S.F.dir === 'wm' ? 'Word → meaning' : 'Meaning → word'}</button>
+    <button class="chip" id="shufBtn" aria-pressed="${S.F.shuffle}">Shuffle new</button>
+    <button class="chip" id="resetBtn">Reset progress</button></div></div>`;
+  return h;
+}
+function bindFlash() {
+  const card = $('#card'); if (card) card.onclick = () => { S.F.flipped = true; render(false); };
+  document.querySelectorAll('[data-g]').forEach(b => b.onclick = () => grade(+b.dataset.g));
+  $('#dirBtn').onclick = () => { S.F.dir = S.F.dir === 'wm' ? 'mw' : 'wm'; S.F.flipped = false; render(false); };
+  $('#shufBtn').onclick = () => { S.F.shuffle = !S.F.shuffle; render(); };
+  $('#resetBtn').onclick = () => {
+    if (!confirm('Reset flashcard progress for this set?')) return;
+    for (const k of Object.keys(S.prog)) if (k.startsWith(S.setId + '::')) delete S.prog[k];
+    saveProg(); render();
+  };
+}
+function grade(g) {
+  const it = S.F.queue[0]; if (!it || !S.F.flipped) return;
+  const k = key(it), r = S.prog[k] || { box: 0, due: 0 };
+  if (g === 0) { r.box = 0; r.due = Date.now() + 10 * 60e3; S.F.queue.push(S.F.queue.shift()); }
+  else { r.box = Math.min(5, r.box + g); r.due = Date.now() + DAYS[r.box] * 864e5; S.F.queue.shift(); }
+  S.prog[k] = r; saveProg(); S.F.flipped = false; render(false);
+}
+
+/* ---------------- render ---------------- */
+function render(rebuild = true) {
+  chrome();
+  const v = $('#view');
+  if (!cur()) $('#pfilters').innerHTML = '';
+  if (!cur()) {
+    v.innerHTML = `<div class="empty"><h3>No vocabulary yet</h3>
+      <p>Add one or more <code>.txt</code> vocabulary files with the + button, or drop them on this page.</p>
+      <p>Line format: <code>word (forms) | pos | level | definition</code></p>
+      <button class="btn primary" id="emptyAdd">Add a file</button></div>`;
+    $('#emptyAdd').onclick = () => $('#file').click(); return;
+  }
+  if (S.mode === 'flash' && rebuild) buildQueue();
+  v.innerHTML = S.mode === 'simple' ? viewSimple() : S.mode === 'dict' ? viewDict() : viewFlash();
+  panelFilters(); bindFilters(); if (S.mode === 'flash') bindFlash();
+  if (rebuild) window.scrollTo({ top: 0 });
+}
+
+/* ---------------- events ---------------- */
+function setPanel(o) {
+  $('#panel').classList.toggle('hidden', !o); $('#scrim').classList.toggle('hidden', !o);
+  $('#menuBtn').setAttribute('aria-expanded', o);
+}
+$('#menuBtn').onclick = () => setPanel($('#panel').classList.contains('hidden'));
+$('#closeBtn').onclick = $('#scrim').onclick = () => setPanel(false);
+$('#q').onfocus = () => setPanel(false);
+addEventListener('keydown', e => { if (e.key === 'Escape') setPanel(false); });
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => { S.mode = b.dataset.mode; store.set('vr.mode', S.mode); setPanel(false); render(); });
+$('#themeBtn').onclick = () => {
+  S.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  store.set('vr.theme', S.theme); applyTheme();
+};
+let qt; $('#q').oninput = e => { clearTimeout(qt); qt = setTimeout(() => { S.q = e.target.value; render(); }, 120); };
+$('#clearQ').onclick = () => { $('#q').value = ''; S.q = ''; render(); $('#q').focus(); };
+$('#setSel').onchange = e => { S.setId = e.target.value; store.set('vr.setId', S.setId); S.section = 'all'; S.levels.clear(); setPanel(false); render(); };
+$('#delBtn').onclick = () => {
+  const c = cur(); if (!c || !confirm('Remove "' + c.data.title + '" from this device?')) return;
+  S.sets = S.sets.filter(s => s.id !== c.meta.id); delete parsed[c.meta.id];
+  store.set('vr.sets', S.sets); S.setId = S.sets[0] ? S.sets[0].id : null; store.set('vr.setId', S.setId); render();
+};
+$('#addBtn').onclick = () => $('#file').click();
+$('#file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); addFiles(e.dataTransfer.files); });
+addEventListener('keydown', e => {
+  if (S.mode !== 'flash' || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (!S.F.flipped && S.F.queue[0]) { S.F.flipped = true; render(false); } }
+  else if (e.key === '1') grade(0); else if (e.key === '2') grade(1); else if (e.key === '3') grade(2);
+});
+async function addFiles(files) {
+  let last = null;
+  for (const f of files) {
+    const text = await f.text(); const id = hashId(f.name);
+    const i = S.sets.findIndex(s => s.id === id), rec = { id, name: f.name, text };
+    if (i >= 0) S.sets[i] = rec; else S.sets.push(rec);
+    delete parsed[id]; last = id;
+  }
+  if (last) { S.setId = last; store.set('vr.sets', S.sets); store.set('vr.setId', last); S.section = 'all'; S.levels.clear(); setPanel(false); render(); }
+}
+
+/* optional: when hosted, a sets.json next to this page lists .txt files to load automatically
+   e.g.  {"sets": ["NOV05_podcast.txt", "NOV05_article.txt"]}                                  */
+async function autoload() {
+  try {
+    const r = await fetch('sets.json', { cache: 'no-cache' }); if (!r.ok) return;
+    const j = await r.json();
+    for (const name of j.sets || []) {
+      const t = await (await fetch(name, { cache: 'no-cache' })).text(); const id = hashId(name);
+      const i = S.sets.findIndex(s => s.id === id), rec = { id, name, text: t };
+      if (i >= 0) S.sets[i] = rec; else S.sets.push(rec); delete parsed[id];
+    }
+    store.set('vr.sets', S.sets);
+  } catch (e) {}
+}
+
+applyTheme();
+autoload().finally(() => { S.sets.forEach(s => cur()); render(); });
+</script>
+</body>
+</html>
