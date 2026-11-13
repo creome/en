@@ -7,7 +7,8 @@
 <title>Vocab Reader</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap"></noscript>
 <style>
 :root{
   --bg:#f6f2ea; --surface:#fffdf8; --ink:#1f1d1a; --muted:#6b665d; --line:#e4ddd0;
@@ -242,7 +243,8 @@ function items(withSearch = true) {
       if (S.levels.size && !S.levels.has(it.level)) continue;
       if (q) {
         const w = norm(it.word), f = norm(it.forms), d = norm(it.def);
-        let sc = w.startsWith(q) ? 0 : w.includes(q) ? 1 : f.includes(q) ? 2 : d.includes(q) ? 3 : -1;
+        const wl = w.replace(/\s*\(.*\)$/, '').trim();
+        let sc = (w === q || wl === q) ? 0 : w.startsWith(q) ? 1 : w.includes(q) ? 2 : f.includes(q) ? 3 : d.includes(q) ? 4 : -1;
         if (sc < 0) continue;
         out.push({ ...it, _sec: sec.name, _si: si, _sc: sc });
       } else out.push({ ...it, _sec: sec.name, _si: si, _sc: 0 });
@@ -299,6 +301,7 @@ function viewSimple() {
   const q = S.q.trim(); let html = '';
   c.data.sections.forEach((sec, si) => {
     const its = list.filter(i => i._si === si); if (!its.length) return;
+    if (q) its.sort((a, b) => a._sc - b._sc);
     if (sec.name) html += `<h2 class="sec">${esc(sec.name)}</h2>`;
     html += '<div class="cols">' + its.map((it, n) =>
       `<p class="e"><span class="n">${n + 1}.</span> <b>${hl(it.head, q)}</b> <i class="pl">${tagOf(it)}</i> – ${hl(it.def, q)}</p>`).join('') + '</div>';
@@ -460,20 +463,28 @@ async function addFiles(files) {
 /* optional: when hosted, a sets.json next to this page lists .txt files to load automatically
    e.g.  {"sets": ["NOV05_podcast.txt", "NOV05_article.txt"]}                                  */
 async function autoload() {
+  // never wait on the network: give up after 4 s so a bad connection cannot freeze the app
+  const get = (u) => { const c = new AbortController(); const t = setTimeout(() => c.abort(), 4000);
+    return fetch(u, { cache: 'no-cache', signal: c.signal }).finally(() => clearTimeout(t)); };
+  let changed = false;
   try {
-    const r = await fetch('sets.json', { cache: 'no-cache' }); if (!r.ok) return;
+    const r = await get('sets.json'); if (!r.ok) return false;
     const j = await r.json();
     for (const name of j.sets || []) {
-      const t = await (await fetch(name, { cache: 'no-cache' })).text(); const id = hashId(name);
+      const t = await (await get(name)).text(); const id = hashId(name);
       const i = S.sets.findIndex(s => s.id === id), rec = { id, name, text: t };
-      if (i >= 0) S.sets[i] = rec; else S.sets.push(rec); delete parsed[id];
+      if (i >= 0) { if (S.sets[i].text !== t) { S.sets[i] = rec; changed = true; } } else { S.sets.push(rec); changed = true; }
+      delete parsed[id];
     }
-    store.set('vr.sets', S.sets);
+    if (changed) store.set('vr.sets', S.sets);
   } catch (e) {}
+  return changed;
 }
 
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) navigator.serviceWorker.register('sw.js').catch(() => {});
 applyTheme();
-autoload().finally(() => { S.sets.forEach(s => cur()); render(); });
+render();                                   // show what is already stored right away
+autoload().then(changed => { if (changed) render(); });   // then refresh in the background
 </script>
 </body>
 </html>
