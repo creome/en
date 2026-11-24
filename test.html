@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice test v1</title>
+<style>
+body{font-family:system-ui,Arial,sans-serif;max-width:560px;margin:0 auto;padding:16px;line-height:1.5}
+button{font:inherit;padding:14px 18px;margin:6px 6px 6px 0;border-radius:10px;border:1px solid #888;background:#2f5bea;color:#fff}
+button.g{background:#eee;color:#111}
+pre{background:#f3f3f3;color:#111;padding:10px;border-radius:8px;white-space:pre-wrap;font-size:13px}
+</style></head><body>
+<h2>Voice test v1</h2>
+<p>Tap a button. You should hear the word &ldquo;pavement&rdquo;.</p>
+<button id="a">1. Speak (default voice)</button>
+<button id="b" class="g">2. Speak (English voice)</button>
+<pre id="log">Loading...</pre>
+<script>
+const log=m=>{document.getElementById('log').textContent+='\n'+m};
+document.getElementById('log').textContent='Page loaded.';
+const ss=window.speechSynthesis;
+if(!ss){log('NO speechSynthesis in this browser.')}else{
+  const show=()=>{const v=ss.getVoices();log('Voices found: '+v.length+(v.length?' -> '+v.slice(0,8).map(x=>x.name+' ('+x.lang+')').join('; '):''))};
+  show();ss.onvoiceschanged=show;
+  function go(useVoice){
+    const u=new SpeechSynthesisUtterance('pavement');
+    if(useVoice){const v=ss.getVoices().find(x=>/^en/i.test(x.lang));if(v){u.voice=v;u.lang=v.lang;log('Using '+v.name)}else{u.lang='en-US';log('No English voice listed, using lang en-US')}}
+    u.onstart=()=>log('started speaking');u.onend=()=>log('finished');u.onerror=e=>log('ERROR: '+e.error);
+    log('speak() called');ss.speak(u);
+  }
+  document.getElementById('a').onclick=()=>go(false);
+  document.getElementById('b').onclick=()=>go(true);
+}
+</script></body></html>
