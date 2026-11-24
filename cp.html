@@ -114,6 +114,12 @@ function start(mode,deck){
  if(!deck.length){$('#msg').textContent='No cards match those filters (or none are due). Try loosening them.';return}
  $('#msg').textContent='';S={mode,deck,i:0,res:[],flip:false,chk:false};show('sess');render();
 }
+function speak(t){
+ try{const ss=window.speechSynthesis;if(!ss)return;const u=new SpeechSynthesisUtterance(t.replace(/\s*\+.*$/,'')),vs=ss.getVoices(),f=l=>vs.find(v=>v.lang.replace('_','-').toLowerCase()===l.toLowerCase()),v=f('en-GB')||f('en-US')||vs.find(v=>/^en/i.test(v.lang));
+  if(v){u.voice=v;u.lang=v.lang}else u.lang='en-US';u.rate=.9;
+  if(ss.speaking||ss.pending){ss.cancel();setTimeout(()=>ss.speak(u),80)}else ss.speak(u)}catch(e){}
+}
+try{speechSynthesis.getVoices()}catch(e){}
 const say=w=>`<button class="say" data-say="${esc(w)}">🔊 Listen</button>`;
 const rv=c=>`<div class="word sm">${esc(c.word)}</div><div class="meta">${esc(c.meta)}</div>${say(c.word)}<div class="sec def"><div class="l">Meaning</div>${c.def}</div><div class="sec"><div class="l">Example</div>${c.ex}</div><div class="sec"><div class="l">Use it</div>${c.use}</div>`;
 const inp=ph=>`<div class="ans"><input type="text" id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${ph}"><button class="p" id="chk">Check</button></div><div id="fb" style="width:100%"></div>`;
@@ -144,7 +150,7 @@ function check(){
  const o=$('#ovr');if(o)o.onclick=()=>{S.res[S.i]=true;rate(c,true);$('#ps').textContent=S.res.filter(x=>x===true).length+' correct';o.remove()};
 }
 document.addEventListener('click',e=>{
- const b=e.target.closest('[data-say]');if(b){try{const u=new SpeechSynthesisUtterance(b.dataset.say.replace(/\s*\+.*$/,''));u.lang='en-GB';speechSynthesis.cancel();speechSynthesis.speak(u)}catch(x){}return}
+ const b=e.target.closest('[data-say]');if(b){speak(b.dataset.say);return}
  const o=e.target.closest('.opt');if(o&&S&&!S.chk){S.chk=true;const c=S.deck[S.i],pick=S.opts[o.dataset.k],ok=pick.id===c.id;S.res[S.i]=ok;rate(c,ok);
   document.querySelectorAll('.opt').forEach((x,k)=>{x.disabled=true;if(S.opts[k].id===c.id)x.classList.add('c');else if(x===o)x.classList.add('w')});
   $('#fb').insertAdjacentHTML('beforeend',rv(c)+'<button class="p" id="nx" style="margin-top:10px">Next →</button>');$('#nx').onclick=next;$('#ps').textContent=S.res.filter(x=>x===true).length+' correct'}
