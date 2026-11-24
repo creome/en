@@ -40,7 +40,7 @@ textarea{width:100%;min-height:80px;margin-top:8px}.fbk{text-align:left;white-sp
 .fin{text-align:center;padding:26px 16px}.sc{font-size:2.4rem;font-weight:700}.row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:14px}
 .miss{max-width:420px;margin:12px auto 0;text-align:left;font-size:.9rem;color:var(--mu)}
 </style></head><body><main>
-<h1>Card Practice <small style="font-size:.6rem;color:var(--mu);font-weight:400">v3</small></h1>
+<h1>Card Practice <small style="font-size:.6rem;color:var(--mu);font-weight:400">v4</small></h1>
 <section id="home">
  <div class="stats" id="stats"></div>
  <label class="drop" id="drop" for="file"><strong>Add card sheets</strong><p>Choose one or several HTML files, or drag them here. They are saved on this device.</p></label>
@@ -115,10 +115,10 @@ function start(mode,deck){
  $('#msg').textContent='';S={mode,deck,i:0,res:[],flip:false,chk:false};show('sess');render();
 }
 function note(m){let n=$('#tt');if(!n){n=document.createElement('div');n.id='tt';n.style.cssText='position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:8px 12px;font-size:.8rem;z-index:9';document.body.appendChild(n)}n.textContent=m;clearTimeout(n.t);n.t=setTimeout(()=>n.remove(),7000)}
-function speak(t){
- try{const ss=window.speechSynthesis;if(!ss){note('Voice check: this browser has no speech support');return}const u=new SpeechSynthesisUtterance(t.replace(/\s*\+.*$/,'')),vs=ss.getVoices(),f=l=>vs.find(v=>v.lang.replace('_','-').toLowerCase()===l.toLowerCase()),v=f('en-GB')||f('en-US')||vs.find(v=>/^en/i.test(v.lang));
+function speak(t,n){n=n||0;
+ try{const ss=window.speechSynthesis;if(!ss){note('Voice check: this browser has no speech support');return}const u=new SpeechSynthesisUtterance(t.replace(/\s*\+.*$/,'')),vs=ss.getVoices(),f=l=>vs.find(v=>v.lang.replace('_','-').toLowerCase()===l.toLowerCase()),rk=x=>x.name===LS.g('cp_voice','')?-1:({'en-us':0,'en-gb':1})[x.lang.replace('_','-').toLowerCase()]??2,en=vs.filter(x=>/^en/i.test(x.lang)).sort((a,b)=>rk(a)-rk(b)),v=en[n];
   if(v){u.voice=v;u.lang=v.lang}else u.lang='en-US';u.rate=.9;
-  const info='Voice check: '+vs.length+' voices · '+(v?v.name+' ('+v.lang+')':'default voice');u.onerror=e=>note(info+' · error: '+e.error);
+  const info='Voice check: '+vs.length+' voices · '+(v?v.name+' ('+v.lang+')':'default voice');u.onstart=()=>{if(v)LS.s('cp_voice',v.name)};u.onerror=e=>{if(n<2&&en[n+1])return speak(t,n+1);note(info+' · error: '+e.error)};
   if(ss.speaking||ss.pending){ss.cancel();setTimeout(()=>ss.speak(u),80)}else ss.speak(u)}catch(e){}
 }
 try{speechSynthesis.getVoices()}catch(e){}
