@@ -2,6 +2,8 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Card Practice</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2f5bea">
 <style>
 :root{--bg:#f6f5f2;--sf:#fff;--tx:#1a1a1a;--mu:#6b6b6b;--ln:#dcdad4;--ac:#2f5bea;--at:#fff;--ok:#1f8a4c;--bd:#c63d2f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15161a;--sf:#1f2026;--tx:#ececec;--mu:#9a9aa3;--ln:#33343c;--ac:#7b9bff;--at:#10131f;--ok:#4cc27c;--bd:#ef7a6c}}
@@ -40,16 +42,17 @@ textarea{width:100%;min-height:80px;margin-top:8px}.fbk{text-align:left;white-sp
 .fin{text-align:center;padding:26px 16px}.sc{font-size:2.4rem;font-weight:700}.row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:14px}
 .miss{max-width:420px;margin:12px auto 0;text-align:left;font-size:.9rem;color:var(--mu)}
 </style></head><body><main>
-<h1>Card Practice <small style="font-size:.6rem;color:var(--mu);font-weight:400">v4</small></h1>
+<h1>Card Practice <small style="font-size:.6rem;color:var(--mu);font-weight:400">v5</small></h1>
 <section id="home">
  <div class="stats" id="stats"></div>
  <label class="drop" id="drop" for="file"><strong>Add card sheets</strong><p>Choose one or several HTML files, or drag them here. They are saved on this device.</p></label>
  <input id="file" type="file" accept=".html,.htm,text/html" multiple hidden>
  <div class="msg" id="msg"></div>
+ <div class="bar"><button id="exp">Export backup</button><button onclick="document.getElementById('imp').click()">Import backup</button><input id="imp" type="file" accept=".json,application/json" hidden></div>
  <div id="lib" hidden>
   <div class="box">
    <div class="lbl">Level (none selected = all)</div><div class="bar" id="lv"></div>
-   <div class="r2"><label>Topic <select id="top"></select></label><label>Source <select id="src"></select></label></div>
+   <div class="r2"><label>Topic <select id="top"></select></label><label>Deck <select id="dk"></select></label><label>Source <select id="src"></select></label></div>
    <div class="r2"><label><input type="checkbox" id="shuf" checked> Shuffle</label><label><input type="checkbox" id="due"> Due cards only</label><label><input type="checkbox" id="rev"> Flashcards: meaning → word</label><label>Cards <select id="n"><option>10</option><option selected>20</option><option>50</option><option value="9999">All</option></select></label></div>
    <div id="cnt"></div>
   </div>
@@ -58,6 +61,7 @@ textarea{width:100%;min-height:80px;margin-top:8px}.fbk{text-align:left;white-sp
    <button data-m="cloze">Fill the blank<small>Complete the example sentence</small></button>
    <button data-m="type">Type it<small>Read the meaning, type the word</small></button>
    <button data-m="quiz">Quiz<small>Pick the right word of four</small></button>
+   <button data-m="story">Tell the story<small>Cue cards and Part 3, in order</small></button>
    <button data-m="write" id="wm" hidden>Write a sentence<small>Get feedback from Claude</small></button>
   </div>
   <div class="box"><div class="lbl">Mastered by source</div><div id="bysrc"></div></div>
@@ -79,27 +83,35 @@ const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,m=>({'&'
 const LS={g(k,d){try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}},s(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let lib=LS.g('cp_lib',{}),prog=LS.g('cp_prog',{}),st=LS.g('cp_st',{streak:0,last:'',today:0}),lv=new Set(),S=null,SAMPLE=null,clr=false;
 const IV=[0,6e5,864e5,2592e5,6048e5,18144e5],day=o=>new Date(Date.now()+o*864e5).toISOString().slice(0,10);
-const rich=el=>el?[...el.childNodes].map(n=>n.nodeName==='B'?'<b>'+esc(n.textContent)+'</b>':esc(n.textContent)).join(''):'';
+const rich=el=>el?[...el.childNodes].map(n=>n.nodeName==='B'?'<b>'+esc(n.textContent)+'</b>':n.nodeName==='I'?'<i>'+esc(n.textContent)+'</i>':n.nodeName==='BR'?'<br>':esc(n.textContent)).join(''):'';
+Object.keys(lib).forEach(k=>{if(!k.includes('|')){const c=lib[k];c.type='Vocab';c.id='Vocab|'+k;lib[c.id]=c;delete lib[k];if(prog[k]){prog[c.id]=prog[k];delete prog[k]}}});
 function parse(text,name){
- const d=new DOMParser().parseFromString(text,'text/html'),pg=[...d.querySelectorAll('.page')],out=[];
- (pg.length?pg:[d.body]).forEach((p,k,a)=>{const src=name.replace(/\.html?$/i,'')+(a.length>1?' · set '+(k+1):'');
-  p.querySelectorAll('.card').forEach(c=>{const g=s=>c.querySelector(s),t=s=>g(s)?g(s).textContent.trim():'',w=t('.word');if(!w||!g('.def'))return;
-   const ex=g('.ex'),us=g('.use'),cl=ex&&ex.querySelector('b')?ex:us;
-   out.push({id:w.toLowerCase(),word:w,meta:t('.pos'),lvl:(t('.pos').match(/\b[ABC][12]\b/)||[''])[0],topic:t('.topic'),tag:t('.tag'),src,def:rich(g('.def')),defT:t('.def'),ex:rich(ex),use:rich(us),
-    clz:cl?rich(cl).replace(/<b>.*?<\/b>/g,'<span class="blank"></span>'):'',ans:cl?[...cl.querySelectorAll('b')].map(b=>b.textContent):[]});});});
+ const d=new DOMParser().parseFromString(text,'text/html'),out=[],fr={},base=name.replace(/\.html?$/i,''),pg=[...d.querySelectorAll('.page')];
+ const story=[...d.querySelectorAll('.slot')].some(x=>/^(POSITION|REASON|COUNTER)$/i.test(x.textContent.trim()))?'Part 3':'Cue card';
+ (pg.length?pg:[d.body]).forEach((p,k,a)=>{const src=base+(a.length>1?' · set '+(k+1):'');
+  p.querySelectorAll('.card').forEach(c=>{
+   const g=x=>c.querySelector(x),t=x=>g(x)?g(x).textContent.trim():'',tag=t('.tag'),role=t('.slot').toUpperCase();
+   if(g('.rule')&&!g('.def')){fr[tag]=rich(g('.rule')).replace(/<br>/g,' / ');return}
+   const word=t('.word')||t('.bword')||t('.rule-name'),dEl=g('.def')||g('.meta');if(!word||!dEl)return;
+   const type=g('.exs')?'Speaking P1':g('.bword')?story:g('.word')?'Vocab':'Grammar';
+   const meta=g('.pos')?t('.pos'):g('.exs')?t('.ipa'):role,exEl=g('.ex')||g('.sent')||g('.exs'),us=g('.use')||g('.also');
+   const cl=exEl&&exEl.querySelector('b')?exEl:us&&us.querySelector('b')?us:null,bl='<span class="blank"></span>';
+   out.push({word,meta,lvl:(meta.match(/\b[ABC][12]\b/)||[''])[0],topic:t('.topic'),tag,role,src,type,loose:type==='Speaking P1',def:rich(dEl),defT:dEl.textContent.trim(),ex:rich(exEl),use:rich(us),
+    clz:cl?rich(cl).replace(/<b>.*?<\/b>/g,bl):type==='Speaking P1'&&exEl?rich(exEl).replace(/\.{3}/,bl):'',ans:cl?[...cl.querySelectorAll('b')].map(b=>b.textContent):[]});});});
+ out.forEach(c=>{if(c.type==='Grammar'&&fr[c.tag])c.word=fr[c.tag];c.id=c.type+'|'+c.word.toLowerCase()+(c.role?'|'+c.topic.toLowerCase()+'|'+c.role:'')});
  return out;
 }
 const due=c=>!prog[c.id]||prog[c.id].due<=Date.now(),mast=c=>prog[c.id]&&prog[c.id].box>=4;
 function rate(c,ok){const p=prog[c.id]||(prog[c.id]={box:0,due:0,n:0});p.n++;p.box=ok?Math.min(5,p.box+1):0;p.due=Date.now()+IV[p.box];LS.s('cp_prog',prog);
  const d=day(0);if(st.last!==d){st.streak=st.last===day(-1)?st.streak+1:1;st.last=d;st.today=0}st.today++;LS.s('cp_st',st);}
-function pool(){return Object.values(lib).filter(c=>(!lv.size||lv.has(c.lvl))&&(!$('#top').value||c.topic===$('#top').value)&&(!$('#src').value||c.src===$('#src').value))}
+function pool(){return Object.values(lib).filter(c=>(!lv.size||lv.has(c.lvl))&&(!$('#dk').value||c.type===$('#dk').value)&&(!$('#top').value||c.topic===$('#top').value)&&(!$('#src').value||c.src===$('#src').value))}
 function home(){
  const all=Object.values(lib),has=all.length>0;$('#lib').hidden=!has;
  const sk=st.last===day(0)||st.last===day(-1)?st.streak:0;
  $('#stats').innerHTML=has?`<span>🔥 <b>${sk}</b> day streak</span><span><b>${st.last===day(0)?st.today:0}</b> answers today</span><span><b>${all.filter(due).length}</b> due now</span><span><b>${all.filter(mast).length}</b>/${all.length} mastered</span>`:'';
  if(!has)return;
  const opts=(id,vals,lab)=>{const v=$(id).value;$(id).innerHTML=`<option value="">${lab}</option>`+[...new Set(vals)].sort().map(x=>`<option${x===v?' selected':''}>${esc(x)}</option>`).join('')};
- opts('#top',all.map(c=>c.topic).filter(Boolean),'All topics');opts('#src',all.map(c=>c.src),'All sources');
+ opts('#dk',all.map(c=>c.type),'All decks');opts('#top',all.map(c=>c.topic).filter(Boolean),'All topics');opts('#src',all.map(c=>c.src),'All sources');
  $('#lv').innerHTML=['B1','B2','C1','C2'].filter(l=>all.some(c=>c.lvl===l)).map(l=>`<button class="chip${lv.has(l)?' on':''}" data-l="${l}">${l}</button>`).join('');
  const p=pool();$('#cnt').textContent=`${p.length} cards match · ${p.filter(due).length} due now`;
  const g={};all.forEach(c=>{(g[c.src]=g[c.src]||[0,0])[1]++;if(mast(c))g[c.src][0]++});
@@ -109,7 +121,8 @@ function home(){
 function show(id){['home','sess','done'].forEach(x=>$('#'+x).hidden=x!==id);if(id==='home')home()}
 const sh=a=>{for(let k=a.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[a[k],a[j]]=[a[j],a[k]]}return a};
 function start(mode,deck){
- if(!deck){let p=pool();if(mode==='cloze')p=p.filter(c=>c.clz&&c.ans.length);if($('#due').checked)p=p.filter(due);
+ if(!deck&&mode==='story'){const O={HOOK:0,WHAT:1,BODY:2,POSITION:0,REASON:1,COUNTER:2,CLOSE:3},K=c=>c.type+c.topic;deck=pool().filter(c=>c.role).sort((a,b)=>K(a)<K(b)?-1:K(a)>K(b)?1:O[a.role]-O[b.role])}
+ if(!deck){let p=pool();if(mode==='cloze')p=p.filter(c=>c.clz&&(c.ans.length||c.loose));if($('#due').checked)p=p.filter(due);
   p.sort((a,b)=>(prog[a.id]?prog[a.id].due:0)-(prog[b.id]?prog[b.id].due:0));deck=p.slice(0,Number($('#n').value));if($('#shuf').checked)sh(deck);}
  if(!deck.length){$('#msg').textContent='No cards match those filters (or none are due). Try loosening them.';return}
  $('#msg').textContent='';S={mode,deck,i:0,res:[],flip:false,chk:false};show('sess');render();
@@ -123,19 +136,19 @@ function speak(t,n){n=n||0;
 }
 try{speechSynthesis.getVoices()}catch(e){}
 const say=w=>`<button class="say" data-say="${esc(w)}">🔊 Listen</button>`;
-const rv=c=>`<div class="word sm">${esc(c.word)}</div><div class="meta">${esc(c.meta)}</div>${say(c.word)}<div class="sec def"><div class="l">Meaning</div>${c.def}</div><div class="sec"><div class="l">Example</div>${c.ex}</div><div class="sec"><div class="l">Use it</div>${c.use}</div>`;
+const rv=c=>`<div class="word sm">${esc(c.word)}</div><div class="meta">${esc(c.meta)}</div>${say(c.word)}<div class="sec def"><div class="l">Meaning</div>${c.def}</div><div class="sec"><div class="l">Example</div>${c.ex}</div>${c.use?`<div class="sec"><div class="l">Use it</div>${c.use}</div>`:''}`;
 const inp=ph=>`<div class="ans"><input type="text" id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${ph}"><button class="p" id="chk">Check</button></div><div id="fb" style="width:100%"></div>`;
 function render(){
  const c=S.deck[S.i],m=S.mode;S.flip=false;S.chk=false;
  $('#pc').textContent=`${S.i+1} / ${S.deck.length}`;$('#ps').textContent=S.res.filter(x=>x===true).length+' correct';$('#fill').style.width=S.i/S.deck.length*100+'%';
  const hd=`<span class="tag">${esc(c.tag)}</span><span class="topic">${esc(c.topic)}</span>`;let h='';$('#act').hidden=true;
- if(m==='flash')h=$('#rev').checked?`<div class="defbig">${c.def}</div><div class="hint">Which word or phrase? Tap to reveal.</div>`:`<div class="word">${esc(c.word)}</div><div class="meta">${esc(c.meta)}</div>${say(c.word)}<div class="hint">Tap to reveal the meaning.</div>`;
+ if(m==='story')h=`<div class="meta">${esc(c.type)} · ${esc(c.topic)}</div><div class="word">${esc(c.role)}</div><div class="hint">Say this part of your answer out loud, then tap to compare.</div>`;else if(m==='flash')h=$('#rev').checked?`<div class="defbig">${c.def}</div><div class="hint">Which word or phrase? Tap to reveal.</div>`:`<div class="word">${esc(c.word)}</div><div class="meta">${esc(c.meta)}</div>${say(c.word)}<div class="hint">Tap to reveal the meaning.</div>`;
  else if(m==='cloze')h=`<div class="defbig">${c.clz}</div><div class="sec def"><div class="l">Meaning</div>${c.def}</div>${inp('Type the missing word or phrase')}`;
  else if(m==='type')h=`<div class="meta">${esc(c.meta.split(' · ')[0])}</div><div class="defbig">${c.def}</div>${inp('Type the word or phrase')}`;
- else if(m==='quiz'){const o=sh([c,...sh(Object.values(lib).filter(x=>x.id!==c.id)).slice(0,3)]);S.opts=o;h=`<div class="defbig">${c.def}</div><div id="fb" style="width:100%">`+o.map((x,k)=>`<button class="opt" data-k="${k}">${esc(x.word)}</button>`).join('')+'</div>'}
+ else if(m==='quiz'){const o=sh([c,...sh(Object.values(lib).filter(x=>x.id!==c.id&&x.type===c.type)).slice(0,3)]);S.opts=o;h=`<div class="defbig">${c.def}</div><div id="fb" style="width:100%">`+o.map((x,k)=>`<button class="opt" data-k="${k}">${esc(x.word)}</button>`).join('')+'</div>'}
  else h=`<div class="word sm">${esc(c.word)}</div><div class="meta">${esc(c.meta)}</div><div class="defbig">${c.def}</div><textarea id="ta" placeholder="Write your own sentence using this expression"></textarea><button class="p" id="gf" style="margin-top:8px">Get feedback</button><div class="fbk" id="fk"></div>`;
  $('#body').innerHTML=hd+h;
- if(m==='flash')$('#body').onclick=e=>{if(e.target.closest('button'))return;S.flip=!S.flip;const f=S.flip;if(f){$('#body').innerHTML=hd+rv(c);$('#act').innerHTML='<button class="again" id="ag">Again</button><button class="got" id="gt">Got it</button>';$('#act').hidden=false;$('#ag').onclick=()=>fin(c,false);$('#gt').onclick=()=>fin(c,true)}else render()};
+ if(m==='flash'||m==='story')$('#body').onclick=e=>{if(e.target.closest('button'))return;S.flip=!S.flip;const f=S.flip;if(f){$('#body').innerHTML=hd+rv(c);$('#act').innerHTML='<button class="again" id="ag">Again</button><button class="got" id="gt">Got it</button>';$('#act').hidden=false;$('#ag').onclick=()=>fin(c,false);$('#gt').onclick=()=>fin(c,true)}else render()};
  else $('#body').onclick=null;
  const i=$('#in');if(i){i.focus();i.onkeydown=e=>{if(e.key==='Enter')check()};$('#chk').onclick=check}
  if($('#gf'))$('#gf').onclick=feedback;
@@ -146,7 +159,7 @@ function fin(c,ok){S.res[S.i]=ok;rate(c,ok);next()}
 function next(){if(S.i<S.deck.length-1){S.i++;render()}else finish()}
 function check(){
  if(S.chk)return next();const v=$('#in').value.trim();if(!v)return;const c=S.deck[S.i];
- const t=S.mode==='cloze'?[...c.ans,...vars(c)]:vars(c),ok=t.some(x=>nz(x)===nz(v));
+ const t=S.mode==='cloze'?[...c.ans,...vars(c)]:vars(c),ok=c.loose&&S.mode==='cloze'?nz(v).length>2&&vars(c).some(x=>nz(x).includes(nz(v))||nz(v).includes(nz(x))):t.some(x=>nz(x)===nz(v));
  S.chk=true;S.res[S.i]=ok;rate(c,ok);$('#chk').textContent='Next →';
  $('#fb').innerHTML=`<div class="${ok?'good':'bad'}">${ok?'✔ Correct':'✘ Not quite: '+esc(c.word)}</div>`+(ok?'':'<button id="ovr" style="margin-top:6px">I was right</button>')+rv(c);
  const o=$('#ovr');if(o)o.onclick=()=>{S.res[S.i]=true;rate(c,true);$('#ps').textContent=S.res.filter(x=>x===true).length+' correct';o.remove()};
@@ -175,13 +188,16 @@ $('#file').onchange=e=>{addFiles([...e.target.files]);e.target.value=''};
 const dz=$('#drop');['dragenter','dragover'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.add('ov')}));
 ['dragleave','drop'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.remove('ov')}));dz.addEventListener('drop',e=>addFiles([...e.dataTransfer.files]));
 $('#lv').onclick=e=>{const l=e.target.dataset.l;if(!l)return;lv.has(l)?lv.delete(l):lv.add(l);home()};
-['#top','#src'].forEach(s=>$(s).onchange=home);
+['#top','#src','#dk'].forEach(s=>$(s).onchange=home);
 $('#modes').onclick=e=>{const b=e.target.closest('button');if(b)start(b.dataset.m)};
 $('#exit').onclick=$('#home2').onclick=()=>show('home');
 $('#clear').onclick=()=>{if(!clr){clr=true;$('#clear').textContent='Tap again to delete everything';setTimeout(()=>{clr=false;$('#clear').textContent='Clear library and progress'},4000);return}
  lib={};prog={};st={streak:0,last:'',today:0};['cp_lib','cp_prog','cp_st'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});clr=false;$('#clear').textContent='Clear library and progress';home()};
-document.addEventListener('keydown',e=>{if(!S||$('#sess').hidden||S.mode!=='flash'||e.target.closest('input,textarea'))return;
+document.addEventListener('keydown',e=>{if(!S||$('#sess').hidden||!/^(flash|story)$/.test(S.mode)||e.target.closest('input,textarea'))return;
  if(e.key===' '&&!e.target.closest('button')){e.preventDefault();$('#body').click()}else if(S.flip&&e.key==='1')fin(S.deck[S.i],false);else if(S.flip&&e.key==='2')fin(S.deck[S.i],true)});
 home();
+$('#exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({lib,prog,st})],{type:'application/json'}));a.download='cp-backup-'+day(0)+'.json';a.click()};
+$('#imp').onchange=async e=>{try{const d=JSON.parse(await e.target.files[0].text());Object.assign(lib,d.lib||{});Object.assign(prog,d.prog||{});if(d.st&&(d.st.streak||0)>=st.streak)st=d.st;LS.s('cp_lib',lib);LS.s('cp_prog',prog);LS.s('cp_st',st);$('#msg').textContent='Backup restored.';home()}catch(x){$('#msg').textContent='That file is not a valid backup.'}e.target.value=''};
+try{if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}
 try{if(window.claude)claude.use('sample').then(s=>{if(s){SAMPLE=s;home()}}).catch(()=>{})}catch(e){}
 </script></body></html>
